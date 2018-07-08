@@ -10,12 +10,10 @@ class MoveToTarget():
     def targetcallback(self,req):
 	rate=20
 	r=rospy.Rate(rate)
-	self.targetpos_x=req.x
-	self.targetpos_y=req.y
-	self.target_angle=req.angle
+
 	linear_speed=rospy.get_param("~linear_speed",0.2)
 	angular_speed=rospy.get_param("~angular_speed",0.7)
-	angular_tolerance=radians(rospy.get_param("~angular_tolerance",2))
+	#angular_tolerance=radians(rospy.get_param("~angular_tolerance",2))
 	self.cmd_vel=rospy.Publisher('/cmd_vel', Twist, queue_size=5)
 	self.base_frame = rospy.get_param('~base_frame', '/base_link')
 	self.odom_frame = rospy.get_param('~odom_frame', '/odom')
@@ -36,11 +34,14 @@ class MoveToTarget():
 	move_cmd=Twist()
 	self.cmd_vel.publish(move_cmd)
 	rospy.sleep(1.0)
-	move_cmd.angular.z=angular_speed
+	if req.goal_angle<0:
+		move_cmd.angular.z=-angular_speed
+	else:
+		move_cmd.angular.z=angular_speed
 	(position,rotation)=self.get_odom()
 	last_angle=rotation
 	turn_angle=0
-	while abs(turn_angle+angular_tolerance)<abs(self.target_angle) and not rospy.is_shutdown():
+	while abs(turn_angle)<abs(req.goal_angle) and not rospy.is_shutdown():
 		self.cmd_vel.publish(move_cmd)
 		r.sleep()
 		(position,rotation)=self.get_odom()
@@ -51,13 +52,12 @@ class MoveToTarget():
 	move_cmd=Twist()
 	move_cmd.linear.x=linear_speed
 	(position,rotation)=self.get_odom()
+
 	x_start=position.x
 	y_start=position.y
 	distance=0;
-	goal_distance=sqrt(pow((self.targetpos_x - x_start), 2) + 
-                                pow((self.targetpos_y - y_start), 2))
-	while distance<goal_distance and not rospy.is_shutdown():
-		print "%lf %lf %lf %lf"%(position.x,position.y,self.targetpos_x,self.targetpos_y)
+	while distance<req.goal_distance and not rospy.is_shutdown():
+		print "%lf %lf %lf %lf"%(position.x,position.y,distance,req.goal_distance)
 		self.cmd_vel.publish(move_cmd)
 		r.sleep()	
 		(position,rotation)=self.get_odom()
@@ -66,12 +66,14 @@ class MoveToTarget():
 
 	self.cmd_vel.publish(Twist())
 	return DriveToTargetResponse(True)
+
     def __init__(self):
 	rospy.init_node('drivetotarget_server',anonymous=False)
 	rospy.on_shutdown(self.shutdown)
 	s=rospy.Service('drivetotarget',DriveToTarget,self.targetcallback)
 	print "Ready to drive to target"
         rospy.spin()
+
     def get_odom(self):
 
         try:
