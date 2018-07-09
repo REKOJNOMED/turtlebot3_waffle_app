@@ -8,62 +8,33 @@ from turtlebot3_waffle_app.srv import *
 from math import radians, copysign, sqrt, pow, pi
 class MoveToTarget():
     def targetcallback(self,req):
-	rate=20
+	rate=100
 	r=rospy.Rate(rate)
 
-	linear_speed=rospy.get_param("~linear_speed",0.2)
-	angular_speed=rospy.get_param("~angular_speed",0.7)
 	#angular_tolerance=radians(rospy.get_param("~angular_tolerance",2))
-	self.cmd_vel=rospy.Publisher('/cmd_vel', Twist, queue_size=5)
-	self.base_frame = rospy.get_param('~base_frame', '/base_link')
-	self.odom_frame = rospy.get_param('~odom_frame', '/odom')
-	self.tf_listener = tf.TransformListener()
-	rospy.sleep(2)
-	self.odom_frame = '/odom'
-	try:
-            self.tf_listener.waitForTransform(self.odom_frame, '/base_footprint', rospy.Time(), rospy.Duration(1.0))
-            self.base_frame = '/base_footprint'
-        except (tf.Exception, tf.ConnectivityException, tf.LookupException):
-            try:
-                self.tf_listener.waitForTransform(self.odom_frame, '/base_link', rospy.Time(), rospy.Duration(1.0))
-                self.base_frame = '/base_link'
-            except (tf.Exception, tf.ConnectivityException, tf.LookupException):
-                rospy.loginfo("Cannot find transform between /odom and /base_link or /base_footprint")
-                rospy.signal_shutdown("tf Exception")  
-
+	self.cmd_vel=rospy.Publisher('/cmd_vel', Twist, queue_size=1000)
 	move_cmd=Twist()
 	self.cmd_vel.publish(move_cmd)
 	rospy.sleep(1.0)
 	if req.goal_angle<0:
-		move_cmd.angular.z=-angular_speed
+		move_cmd.angular.z=-radians(45)
 	else:
-		move_cmd.angular.z=angular_speed
-	(position,rotation)=self.get_odom()
-	last_angle=rotation
-	turn_angle=0
-	while abs(turn_angle)<abs(req.goal_angle) and not rospy.is_shutdown():
-		self.cmd_vel.publish(move_cmd)
-		r.sleep()
-		(position,rotation)=self.get_odom()
-		delta_angle=normalize_angle(rotation - last_angle)
-		turn_angle+=delta_angle
-		last_angle=rotation
-	position = Point()
+		move_cmd.angular.z=radians(45)
+	#count=int((abs(req.goal_angle)/radians(45))*rate+0.5)
+	#for x in range(0,count):
+                #self.cmd_vel.publish(move_cmd)
+                #r.sleep()
+	self.cmd_vel.publish(move_cmd)
+	rospy.sleep((abs(req.goal_angle)/radians(45)))
 	move_cmd=Twist()
-	move_cmd.linear.x=linear_speed
-	(position,rotation)=self.get_odom()
-
-	x_start=position.x
-	y_start=position.y
-	distance=0;
-	while distance<req.goal_distance and not rospy.is_shutdown():
-		print "%lf %lf %lf %lf"%(position.x,position.y,distance,req.goal_distance)
-		self.cmd_vel.publish(move_cmd)
-		r.sleep()	
-		(position,rotation)=self.get_odom()
-		distance=sqrt(pow((position.x - x_start), 2) + 
-                                pow((position.y - y_start), 2))
-
+	move_cmd.linear.x=0.1
+	#count=int((abs(req.goal_distance)/0.4)*rate+0.5)
+	#for x in range(0,count):
+                #self.cmd_vel.publish(move_cmd)
+                #r.sleep()
+	self.cmd_vel.publish(move_cmd)
+	rospy.sleep((abs(req.goal_distance)/0.1))
+	#rospy.sleep(10)
 	self.cmd_vel.publish(Twist())
 	return DriveToTargetResponse(True)
 
@@ -74,15 +45,6 @@ class MoveToTarget():
 	print "Ready to drive to target"
         rospy.spin()
 
-    def get_odom(self):
-
-        try:
-            (trans, rot)  = self.tf_listener.lookupTransform(self.odom_frame, self.base_frame, rospy.Time(0))
-        except (tf.Exception, tf.ConnectivityException, tf.LookupException):
-            rospy.loginfo("TF Exception")
-            return
-
-        return (Point(*trans), quat_to_angle(Quaternion(*rot)))
 
     def shutdown(self):
 
