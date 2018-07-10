@@ -1,4 +1,4 @@
-float32 goal_distance
-float32 goal_angle
+float32 goal_x
+float32 goal_y
 ---
 bool success
