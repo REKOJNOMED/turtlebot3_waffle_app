@@ -32,6 +32,9 @@ class MoveToTarget():
 
 	move_cmd = Twist()
         move_cmd.linear.x = linear_speed
+	
+	move_back_cmd=Twist()
+	move_back_cmd.linear.x=-linear_speed
 
         turn_cmd = Twist()
         turn_cmd.linear.x = 0
@@ -45,25 +48,66 @@ class MoveToTarget():
 	while distance>1e-1:
 		#print self.scan
 		[x1,y1]=[sin(self.odom.rotation),cos(self.odom.rotation)]
-		[x2,y2]=[self.goal_y-self.odom.y,self.goal_x-self.odom.x]
-		cos_theta=(x1*x2+y1*y2)/(sqrt(pow(x1,2)+pow(y1,2))*sqrt(pow(x2,2)+pow(y2,2)))
-		theta=acos(cos_theta)
-		if x1*x2>0:
-			goal_theta=theta
+		if x1==0:
+			theta1=radians(90)
 		else:
-			goal_theta=-theta
+			theta1=atan(y1/x1)
+		if theta1<0:
+			theta1+=radians(180)
+		if y1<0:
+			theta1+=radians(180)
+
+		[x2,y2]=[self.goal_x-self.odom.x,self.goal_y-self.odom.y]
+
+		
+		if x2==0:
+			theta2=radians(90)
+		else:
+			theta2=atan(y2/x2)
+		if theta2<0:
+			theta2+=radians(180)
+		if y2<0:
+			theta2+=radians(180)
+
+		cos_theta=(x1*x2+y1*y2)/(sqrt(pow(x1,2)+pow(y1,2))*sqrt(pow(x2,2)+pow(y2,2)))
+		if cos_theta>=1:
+			cos_theta=1.0
+		theta=acos(cos_theta)
+		print 'theta1:%lf'%theta1
+		print 'theta2:%lf'%theta2
+		if theta2>theta1: 
+			if theta2-theta1>radians(180):
+				goal_theta=-theta
+			else:
+				goal_theta=theta
+		else:
+			if theta1-theta2>radians(180):
+				goal_theta=theta
+			else:
+				goal_theta=-theta
+	
 		self.angle_range=edit_theta.edit_theta(goal_theta,self.scan.ranges)
 		print 'Odom %lf %lf %lf'%(self.odom.x,self.odom.y,self.odom.rotation)
-		print self.goal_theta
+		print 'goal_theta %lf' % goal_theta
 		print 'angle %lf'%self.angle_range
+		if self.angle_range==-10:
+			self.cmd_vel.publish(move_back_cmd)
+               	        rospy.sleep(delta_distance/linear_speed)
+                        self.odom.x-=delta_distance*sin(self.odom.rotation)
+                        self.odom.y-=delta_distance*cos(self.odom.rotation)
+                        distance=sqrt(pow((req.goal_x - self.odom.x), 2) +
+                                pow((req.goal_y - self.odom.y), 2))
+			self.cmd_vel.publish(Twist())
+			continue
+
 		if self.angle_range<0:
 			self.cmd_vel.publish(anti_turn_cmd)
 		else:
 			self.cmd_vel.publish(turn_cmd)
 		self.odom.rotation-=self.angle_range
-		if self.odom.rotation>radians(180)
+		if self.odom.rotation>radians(180):
 			self.odom.rotation-=radians(360)
-		if self.odom.rotation<radians(-180)
+		if self.odom.rotation<radians(-180):
 			self.odom.rotation+=radians(360)
 		rospy.sleep(abs(self.angle_range)/rotate_speed)
 		self.cmd_vel.publish(move_cmd)
@@ -73,7 +117,7 @@ class MoveToTarget():
 		distance=sqrt(pow((req.goal_x - self.odom.x), 2) + 
 		                pow((req.goal_y - self.odom.y), 2))
 		self.cmd_vel.publish(Twist())
-		rospy.sleep(1)
+#		rospy.sleep(1)
 		print 'distance:%lf'%distance
 
 	rospy.loginfo("Stop ")
